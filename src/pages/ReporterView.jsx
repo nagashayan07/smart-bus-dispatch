@@ -19,7 +19,9 @@ import {
   Phone, 
   Route, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  SlidersHorizontal,
+  ArrowRight
 } from 'lucide-react';
 
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -41,6 +43,8 @@ const COMMUTERS_PER_BUS = 65;
 export default function ReporterView() {
   const { alerts, createAlert, markTripCompleted } = useDispatch();
   const { t, lang } = useLanguage();
+
+  // Basic Form State
   const [selectedStopId, setSelectedStopId] = useState('s_nes');
   const [severity, setSeverity] = useState('Critical');
   const [passengerCount, setPassengerCount] = useState(130);
@@ -49,9 +53,24 @@ export default function ReporterView() {
   const [expandedRouteId, setExpandedRouteId] = useState(null);
   const [expandedCompletedId, setExpandedCompletedId] = useState(null);
 
+  // Optional Custom Route Specification
+  const [showCustomRoute, setShowCustomRoute] = useState(false);
+  const [customOriginId, setCustomOriginId] = useState('s_nes');
+  const [customDestinationId, setCustomDestinationId] = useState('s1'); // Majestic KBS default destination
+
   const currentStop = useMemo(
     () => ALL_BANGALORE_STOPS.find((s) => s.id === selectedStopId) || ALL_BANGALORE_STOPS[0],
     [selectedStopId]
+  );
+
+  const customOriginStop = useMemo(
+    () => ALL_BANGALORE_STOPS.find((s) => s.id === customOriginId) || currentStop,
+    [customOriginId, currentStop]
+  );
+
+  const customDestStop = useMemo(
+    () => ALL_BANGALORE_STOPS.find((s) => s.id === customDestinationId) || ALL_BANGALORE_STOPS[0],
+    [customDestinationId]
   );
 
   const nearestDepots = useMemo(() => {
@@ -80,6 +99,13 @@ export default function ReporterView() {
       targetDepot: nearestDepot.name,
       depotPhone: nearestDepot.phone,
       nearestDistance: `${nearestDepot.distanceKm} km`,
+      // Optional corridor details saved if enabled
+      customRoute: showCustomRoute
+        ? {
+            origin: customOriginStop.name,
+            destination: customDestStop.name,
+          }
+        : null,
     });
     setSubmittedMessage(true);
     setTimeout(() => setSubmittedMessage(false), 4500);
@@ -88,12 +114,15 @@ export default function ReporterView() {
   const activeAlerts = alerts.filter((a) => a.status !== 'Completed');
   const completedAlerts = alerts.filter((a) => a.status === 'Completed');
 
-  const getTraveledStops = (originDepot, destination) => {
+  const getTraveledStops = (dispatch) => {
+    const origin = dispatch.customRoute?.origin || dispatch.targetDepot || 'Depot Hub';
+    const destination = dispatch.customRoute?.destination || dispatch.stopLocation;
+
     return [
-      { step: 1, stop: `${originDepot} (${lang === 'kn' ? 'ಗೇಟ್ ೨ ರಿಂದ ನಿರ್ಗಮನ' : 'Departure Bay 2'})`, time: '0 mins', status: lang === 'kn' ? 'ಹೊರಟಿದೆ' : 'Departed' },
-      { step: 2, stop: lang === 'kn' ? 'ಬಳ್ಳಾರಿ ರಸ್ತೆ / ಫ್ಲೈಓವರ್ ಕನೆಕ್ಟರ್' : 'Bellary Road / Flyover Connector', time: '+4 mins', status: lang === 'kn' ? 'ದಾಟಿದೆ' : 'Passed' },
-      { step: 3, stop: lang === 'kn' ? 'ಯಲಹಂಕ ಪೋಲಿಸ್ ಠಾಣೆ ವೃತ್ತ' : 'Yelahanka Police Station Circle', time: '+7 mins', status: lang === 'kn' ? 'ಪ್ರಸ್ತುತ ನಿಲ್ದಾಣ' : 'Current Checkpoint' },
-      { step: 4, stop: `${destination} (${lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ನಿಲ್ದಾಣ' : 'Commuter Terminal'})`, time: 'ETA: ~8 mins', status: lang === 'kn' ? 'ತಲುಪುತ್ತಿದೆ' : 'Arriving' }
+      { step: 1, stop: `${origin} (${lang === 'kn' ? 'ಆರಂಭಿಕ ನಿಲ್ದಾಣ' : 'Origin Departure'})`, time: '0 mins', status: lang === 'kn' ? 'ಹೊರಟಿದೆ' : 'Departed' },
+      { step: 2, stop: lang === 'kn' ? 'ಬಳ್ಳಾರಿ ರಸ್ತೆ / ಫ್ಲೈಓವರ್ ಕನೆಕ್ಟರ್' : 'Intermediate Transit Corridor', time: '+4 mins', status: lang === 'kn' ? 'ದಾಟಿದೆ' : 'Passed' },
+      { step: 3, stop: `${dispatch.stopLocation} (${lang === 'kn' ? 'ಪಿಕಪ್ ನಿಲ್ದಾಣ' : 'Passenger Pickup'})`, time: '+7 mins', status: lang === 'kn' ? 'ಪ್ರಸ್ತುತ ನಿಲ್ದಾಣ' : 'Current Checkpoint' },
+      { step: 4, stop: `${destination} (${lang === 'kn' ? 'ಅಂತಿಮ ತಲುಪುವ ಸ್ಥಳ' : 'Final Destination'})`, time: 'ETA: ~12 mins', status: lang === 'kn' ? 'ತಲುಪುತ್ತಿದೆ' : 'Arriving' }
     ];
   };
 
@@ -109,6 +138,7 @@ export default function ReporterView() {
       <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-950/80 to-indigo-950/40 pointer-events-none" />
 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start max-w-7xl mx-auto w-full">
+        {/* Left Side: Live Requests */}
         <div className="lg:col-span-7 space-y-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
@@ -119,6 +149,7 @@ export default function ReporterView() {
             <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{t.fieldSubtitle}</p>
           </div>
 
+          {/* Section Tabs */}
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
             <button
               onClick={() => setActiveTab('live')}
@@ -145,6 +176,7 @@ export default function ReporterView() {
             </button>
           </div>
 
+          {/* TAB 1: ACTIVE TRANSIT */}
           {activeTab === 'live' && (
             <div className="space-y-4">
               {activeAlerts.length === 0 ? (
@@ -171,6 +203,18 @@ export default function ReporterView() {
                               {dispatch.passengerCount} {t.commuters} • {dispatch.requiredBuses} {t.busesReq}
                             </span>
                           </div>
+                          
+                          {/* Custom Planned Route Display */}
+                          {dispatch.customRoute && (
+                            <div className="text-xs text-indigo-300 flex items-center gap-1.5 pt-0.5">
+                              <Route className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>
+                                {lang === 'kn' ? 'ನಿಗದಿತ ಮಾರ್ಗ:' : 'Designated Route:'}{' '}
+                                <strong className="text-white">{dispatch.customRoute.origin}</strong> ➔ <strong className="text-emerald-400">{dispatch.customRoute.destination}</strong>
+                              </span>
+                            </div>
+                          )}
+
                           <span className="text-xs text-slate-400 block">
                             {t.requestedDepot}: <strong className="text-indigo-300">{dispatch.targetDepotNumber} ({dispatch.targetDepot})</strong>
                           </span>
@@ -239,7 +283,7 @@ export default function ReporterView() {
                           {isRouteOpen && (
                             <div className="bg-slate-950/90 border border-indigo-500/30 rounded-2xl p-4 space-y-3 animate-in fade-in duration-150">
                               <div className="relative pl-6 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-indigo-500 via-indigo-400 to-emerald-400">
-                                {getTraveledStops(dispatch.targetDepot, dispatch.stopLocation).map((stopItem) => (
+                                {getTraveledStops(dispatch).map((stopItem) => (
                                   <div key={stopItem.step} className="relative flex items-center justify-between text-xs">
                                     <div className="absolute -left-[20px] w-2.5 h-2.5 rounded-full bg-slate-950 border-2 border-emerald-400" />
                                     <div className="flex items-center gap-2">
@@ -263,6 +307,7 @@ export default function ReporterView() {
             </div>
           )}
 
+          {/* TAB 2: COMPLETED ARCHIVE */}
           {activeTab === 'completed' && (
             <div className="space-y-4">
               {completedAlerts.length === 0 ? (
@@ -281,9 +326,11 @@ export default function ReporterView() {
                             {completed.passengerCount} {t.commutersCleared}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-400 block mt-1">
-                          {completed.targetDepotNumber} ({completed.targetDepot})
-                        </span>
+                        {completed.customRoute && (
+                          <span className="text-xs text-indigo-300 block mt-0.5">
+                            {completed.customRoute.origin} ➔ {completed.customRoute.destination}
+                          </span>
+                        )}
                       </div>
 
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg">
@@ -325,6 +372,7 @@ export default function ReporterView() {
           )}
         </div>
 
+        {/* Right Side: Broadcast Form */}
         <div className="lg:col-span-5 w-full">
           <div className="bg-slate-900/90 backdrop-blur-2xl border border-slate-700/80 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -340,13 +388,17 @@ export default function ReporterView() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Surge Stop */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-indigo-400" /> {t.currentStop}
                 </label>
                 <select
                   value={selectedStopId}
-                  onChange={(e) => setSelectedStopId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedStopId(e.target.value);
+                    setCustomOriginId(e.target.value);
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-medium focus:outline-none focus:border-indigo-500 transition"
                 >
                   {ALL_BANGALORE_STOPS.map((stop) => (
@@ -357,6 +409,85 @@ export default function ReporterView() {
                 </select>
               </div>
 
+              {/* OPTIONAL ROUTE CORRIDOR TOGGLE (STARTING TO ENDING STOP) */}
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        {lang === 'kn' ? 'ನಿಗದಿತ ಮಾರ್ಗ ವಿವರ (ಐಚ್ಛಿಕ)' : 'Specify Transit Route Corridor'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {lang === 'kn' ? 'ಆರಂಭಿಕ ಮತ್ತು ಅಂತಿಮ ನಿಲ್ದಾಣ (ಕಡ್ಡಾಯವಲ್ಲ)' : 'Start to End destination (Optional)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomRoute(!showCustomRoute)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition border ${
+                      showCustomRoute
+                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {showCustomRoute ? (lang === 'kn' ? 'ಸಕ್ರಿಯ' : 'Enabled') : (lang === 'kn' ? '+ ಸೇರಿಸಿ' : '+ Add')}
+                  </button>
+                </div>
+
+                {/* Collapsible Dropdowns for Start and End Stop */}
+                {showCustomRoute && (
+                  <div className="space-y-3 pt-2 border-t border-slate-800 animate-in fade-in duration-150">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        {lang === 'kn' ? 'ಆರಂಭಿಕ ನಿಲ್ದಾಣ (Starting Stop):' : 'Starting Pickup Stop:'}
+                      </label>
+                      <select
+                        value={customOriginId}
+                        onChange={(e) => setCustomOriginId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        {ALL_BANGALORE_STOPS.map((stop) => (
+                          <option key={stop.id} value={stop.id}>
+                            {stop.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-rose-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        {lang === 'kn' ? 'ಅಂತಿಮ ತಲುಪುವ ನಿಲ್ದಾಣ (Ending Stop):' : 'Ending Destination Stop:'}
+                      </label>
+                      <select
+                        value={customDestinationId}
+                        onChange={(e) => setCustomDestinationId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        {ALL_BANGALORE_STOPS.map((stop) => (
+                          <option key={stop.id} value={stop.id}>
+                            {stop.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 flex items-center gap-1.5">
+                      <ArrowRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>
+                        {lang === 'kn' ? 'ಬಸ್ ಮಾರ್ಗ:' : 'Route Corridor:'}{' '}
+                        <strong>{customOriginStop.name}</strong> ➔ <strong>{customDestStop.name}</strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Priority Selection */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">{t.surgePriority}</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -371,9 +502,9 @@ export default function ReporterView() {
                       onClick={() => setSeverity(level.key)}
                       className={`py-2 rounded-xl text-xs font-bold transition border ${
                         severity === level.key
-                          ? level === 'Critical'
+                          ? level.key === 'Critical'
                             ? 'bg-rose-600/30 border-rose-500 text-rose-200'
-                            : level === 'Surge'
+                            : level.key === 'Surge'
                             ? 'bg-amber-600/30 border-amber-500 text-amber-200'
                             : 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
                           : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
@@ -385,6 +516,7 @@ export default function ReporterView() {
                 </div>
               </div>
 
+              {/* Commuters Waiting */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-300">{t.estimatedCommuters}</label>
@@ -402,6 +534,7 @@ export default function ReporterView() {
                 />
               </div>
 
+              {/* Bus Sizing Box */}
               <div className="bg-gradient-to-br from-indigo-950/60 to-slate-950 border border-indigo-500/40 rounded-2xl p-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
@@ -413,6 +546,7 @@ export default function ReporterView() {
                 </div>
               </div>
 
+              {/* Target Nearest Depot Card */}
               <div className="space-y-2 bg-slate-950 border border-emerald-500/30 rounded-2xl p-3.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400 flex items-center gap-1">
