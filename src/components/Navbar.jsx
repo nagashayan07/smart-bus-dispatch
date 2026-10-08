@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Radio, LogOut, Map, Languages } from 'lucide-react';
+import { LayoutDashboard, Radio, LogOut, Map, Languages, Users } from 'lucide-react';
 import { useDispatch } from '../context/DispatchContext';
 import { useLanguage } from '../context/LanguageContext';
 import Logo from './Logo';
@@ -22,6 +22,23 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <nav className="flex items-center gap-2">
+            {userRole === 'passenger' && (
+              <NavLink
+                to="/passenger"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    isActive
+                      ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`
+                }
+              >
+                <Users className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">{lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಪೋರ್ಟಲ್' : 'Commuter Portal'}</span>
+                <span className="sm:hidden">{lang === 'kn' ? 'ಪ್ರಯಾಣಿಕ' : 'Pax'}</span>
+              </NavLink>
+            )}
+
             {userRole === 'reporter' && (
               <NavLink
                 to="/reporter"
