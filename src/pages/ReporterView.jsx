@@ -24,8 +24,7 @@ import {
   ArrowRight,
   Users,
   Compass,
-  AlertTriangle,
-  Check
+  AlertTriangle
 } from 'lucide-react';
 
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -45,7 +44,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
 const COMMUTERS_PER_BUS = 65;
 
 export default function ReporterView() {
-  const { alerts, createAlert, markTripCompleted, passengerRequests, clearPassengerRequest } = useDispatch();
+  const { alerts, createAlert, markTripCompleted, passengerRequests } = useDispatch();
   const { t, lang } = useLanguage();
 
   const [selectedStopId, setSelectedStopId] = useState('s_nes');
@@ -58,6 +57,10 @@ export default function ReporterView() {
   const [showCustomRoute, setShowCustomRoute] = useState(false);
   const [customOriginId, setCustomOriginId] = useState('s_nes');
   const [customDestinationId, setCustomDestinationId] = useState('s1');
+
+  // Segregate pending vs completed passenger requests automatically
+  const pendingPassengerDemands = passengerRequests.filter((r) => r.status !== 'Completed');
+  const completedPassengerDemands = passengerRequests.filter((r) => r.status === 'Completed');
 
   const currentStop = useMemo(
     () => ALL_BANGALORE_STOPS.find((s) => s.id === selectedStopId) || ALL_BANGALORE_STOPS[0],
@@ -139,7 +142,7 @@ export default function ReporterView() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
-      {/* HEADER & COMMUTER DEMANDS */}
+      {/* HEADER & PENDING COMMUTER DEMANDS */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -155,16 +158,16 @@ export default function ReporterView() {
             <Users className="w-5 h-5 text-emerald-400" />
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಬಾಕಿ ಬೇಡಿಕೆಗಳು' : 'Pending Corridor Requests'}
+                {lang === 'kn' ? 'ಬಾಕಿ ಇರುವ ಪ್ರಯಾಣಿಕರ ಬೇಡಿಕೆಗಳು' : 'Pending Passenger Requests'}
               </span>
               <span className="text-sm font-black text-emerald-400 font-mono">
-                {passengerRequests.length} {lang === 'kn' ? 'ಬಾಕಿ ಇವೆ' : 'Active'}
+                {pendingPassengerDemands.length} {lang === 'kn' ? 'ಬಾಕಿ ಇವೆ' : 'Waiting'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* COMMUTER DEMAND QUEUE */}
+        {/* COMMUTER DEMAND QUEUE: ONLY SHOWS ACTIVE/PENDING DEMANDS */}
         <div className="pt-4 border-t border-slate-800/80 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -173,38 +176,37 @@ export default function ReporterView() {
                 {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಪ್ರಯಾಣ ಬೇಡಿಕೆಗಳು' : 'Live Commuter Route Demands'}
               </h3>
             </div>
-            {passengerRequests.length > 0 && (
+            {pendingPassengerDemands.length > 0 && (
               <span className="text-[11px] text-slate-400">
-                {lang === 'kn' ? 'ಮಾರ್ಗ ಆಯ್ಕೆ ಮಾಡಲು "ಅಳವಡಿಸಿ" ಕ್ಲಿಕ್ ಮಾಡಿ' : 'Click "Adopt Route" to dispatch relief bus'}
+                {lang === 'kn' ? 'ಬಸ್ ನಿಲ್ದಾಣ ತಲುಪಿದಾಗ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತೆರವುಗೊಳ್ಳುತ್ತದೆ' : 'Auto-clears once relief bus reaches stop'}
               </span>
             )}
           </div>
 
-          {/* If No Passenger Requests are pending */}
-          {passengerRequests.length === 0 ? (
+          {pendingPassengerDemands.length === 0 ? (
             <div className="bg-slate-950/70 border border-dashed border-emerald-500/30 rounded-2xl p-6 text-center space-y-2">
               <CheckCircle2 className="w-7 h-7 text-emerald-400 mx-auto" />
               <div className="text-xs font-bold text-white">
                 {lang === 'kn'
-                  ? 'ಯಾವುದೇ ಬಾಕಿ ಬೇಡಿಕೆಗಳಿಲ್ಲ — ಎಲ್ಲಾ ಪ್ರಯಾಣಿಕರ ಬೇಡಿಕೆಗಳಿಗೆ ಬಸ್‌ಗಳನ್ನು ಕಳುಹಿಸಲಾಗಿದೆ!'
-                  : 'All Passenger Requests Cleared — Relief Buses Dispatched to Stops!'}
+                  ? 'ಯಾವುದೇ ಬಾಕಿ ಬೇಡಿಕೆಗಳಿಲ್ಲ — ಎಲ್ಲಾ ಪ್ರಯಾಣಿಕರ ಬೇಡಿಕೆಗಳಿಗೆ ಬಸ್‌ಗಳು ತಲುಪಿವೆ!'
+                  : 'All Passenger Requests Cleared — Relief Buses Reached Stops!'}
               </div>
               <p className="text-[11px] text-slate-400 max-w-md mx-auto">
                 {lang === 'kn'
-                  ? 'ಪ್ರಯಾಣಿಕರು ಹೊಸ ಮಾರ್ಗವನ್ನು ಕೋರಿದ ತಕ್ಷಣ ಇಲ್ಲಿ ಲೈವ್ ಆಗಿ ಕಾಣಿಸುತ್ತದೆ.'
-                  : 'As soon as commuters at stops request new pickup corridors, they will appear here.'}
+                  ? 'ಯಾವುದಾದರೂ ಪ್ರಯಾಣಿಕರು ಹೊಸ ಮಾರ್ಗವನ್ನು ಕೋರಿದಾಗ ಮಾತ್ರ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.'
+                  : 'When passengers submit new travel requests, they will automatically appear here until served.'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {passengerRequests.map((req) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {pendingPassengerDemands.map((req) => (
                 <div
                   key={req.id}
                   className="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-2xl space-y-2 transition flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-900">
-                      <span className="font-bold text-white truncate max-w-[100px]">{req.passengerName}</span>
+                      <span className="font-bold text-white truncate max-w-[120px]">{req.passengerName}</span>
                       <span className="text-[10px] text-slate-500 font-mono">{req.time}</span>
                     </div>
 
@@ -219,29 +221,19 @@ export default function ReporterView() {
                     </div>
                   </div>
 
-                  <div className="pt-2 mt-2 border-t border-slate-900 flex items-center justify-between gap-1">
+                  <div className="pt-2 mt-2 border-t border-slate-900 flex items-center justify-between">
                     <span className="text-[11px] text-amber-300 font-mono font-bold">
                       {req.groupCount} Pax
                     </span>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleAdoptPassengerRoute(req)}
-                        title="Adopt this route into dispatch form"
-                        className="px-2 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-200 hover:text-white text-[10px] font-bold transition flex items-center gap-1"
-                      >
-                        <Compass className="w-3 h-3" />
-                        <span>{lang === 'kn' ? 'ಅಳವಡಿಸಿ' : 'Adopt'}</span>
-                      </button>
-
-                      <button
-                        onClick={() => clearPassengerRequest(req.id)}
-                        title="Clear request manually (bus reached stop)"
-                        className="p-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleAdoptPassengerRoute(req)}
+                      title="Adopt this route into dispatch form"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-200 hover:text-white text-[11px] font-bold transition flex items-center gap-1"
+                    >
+                      <Compass className="w-3 h-3" />
+                      <span>{lang === 'kn' ? 'ಅಳವಡಿಸಿ' : 'Adopt'}</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -409,60 +401,94 @@ export default function ReporterView() {
             </div>
           )}
 
+          {/* COMPLETED ARCHIVE: SHOWS COMPLETED BUS MISSIONS AND SERVED PASSENGERS */}
           {activeTab === 'completed' && (
-            <div className="space-y-4">
-              {completedAlerts.length === 0 ? (
-                <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs">
-                  {lang === 'kn' ? 'ಪೂರ್ಣಗೊಂಡ ಯಾವುದೇ ಸೇವೆಗಳಿಲ್ಲ.' : 'No completed relief tasks archived yet.'}
-                </div>
-              ) : (
-                completedAlerts.map((completed) => (
-                  <div key={completed.id || completed._id} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                          <span className="font-bold text-white text-base">{completed.stopLocation}</span>
-                          <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                            {completed.passengerCount} {t.commutersCleared}
+            <div className="space-y-6">
+              {/* Completed Bus Dispatches */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  {lang === 'kn' ? 'ಪೂರ್ಣಗೊಂಡ ಪರಿಹಾರ ಕಾರ್ಯಾಚರಣೆಗಳು' : 'Fulfilled Bus Missions'} ({completedAlerts.length})
+                </span>
+
+                {completedAlerts.length === 0 ? (
+                  <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-2xl p-6 text-center text-slate-500 text-xs">
+                    {lang === 'kn' ? 'ಯಾವುದೇ ಪೂರ್ಣಗೊಂಡ ಸೇವೆಗಳಿಲ್ಲ.' : 'No completed relief tasks archived yet.'}
+                  </div>
+                ) : (
+                  completedAlerts.map((completed) => (
+                    <div key={completed.id || completed._id} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                            <span className="font-bold text-white text-base">{completed.stopLocation}</span>
+                            <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                              {completed.passengerCount} {t.commutersCleared}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          {t.missionCompleted}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-bold block">{t.busVehicle}</span>
+                          <span className="font-mono text-emerald-300 font-bold truncate block mt-0.5">
+                            {completed.assignedBus}
+                          </span>
+                        </div>
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-bold block">{t.dutyPilot}</span>
+                          <span className="text-slate-100 font-semibold truncate block mt-0.5">
+                            {completed.driverName}
+                          </span>
+                        </div>
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-bold block">{t.driverMobile}</span>
+                          <span className="text-slate-300 font-mono truncate block mt-0.5">
+                            {completed.driverPhone}
+                          </span>
+                        </div>
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-500 font-bold block">{lang === 'kn' ? 'ಪೂರ್ಣಗೊಂಡ ಸಮಯ' : 'Completed At'}</span>
+                          <span className="text-emerald-400 font-mono block mt-0.5">
+                            {completed.completedAt || 'Recently'}
                           </span>
                         </div>
                       </div>
-
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {t.missionCompleted}
-                      </span>
                     </div>
+                  ))
+                )}
+              </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-500 font-bold block">{t.busVehicle}</span>
-                        <span className="font-mono text-emerald-300 font-bold truncate block mt-0.5">
-                          {completed.assignedBus}
-                        </span>
+              {/* Automatically Fulfilled Passenger Demands */}
+              {completedPassengerDemands.length > 0 && (
+                <div className="space-y-3 pt-3 border-t border-slate-800">
+                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
+                    {lang === 'kn' ? 'ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತೆರವುಗೊಳಿಸಲಾದ ಪ್ರಯಾಣಿಕರ ಕೋರಿಕೆಗಳು' : 'Auto-Fulfilled Commuter Requests'} ({completedPassengerDemands.length})
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {completedPassengerDemands.map((pax) => (
+                      <div key={pax.id} className="bg-slate-950 border border-emerald-500/30 p-3 rounded-xl space-y-1 text-xs">
+                        <div className="flex items-center justify-between text-slate-300">
+                          <span className="font-bold text-white">{pax.passengerName}</span>
+                          <span className="text-[10px] text-emerald-400 font-bold">Fulfilled</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {pax.origin} ➔ {pax.destination} ({pax.groupCount} Pax)
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          Cleared by: {pax.clearedByBus} @ {pax.completedAt}
+                        </div>
                       </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-500 font-bold block">{t.dutyPilot}</span>
-                        <span className="text-slate-100 font-semibold truncate block mt-0.5">
-                          {completed.driverName}
-                        </span>
-                      </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-500 font-bold block">{t.driverMobile}</span>
-                        <span className="text-slate-300 font-mono truncate block mt-0.5">
-                          {completed.driverPhone}
-                        </span>
-                      </div>
-                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-500 font-bold block">{lang === 'kn' ? 'ಪೂರ್ಣಗೊಂಡ ಸಮಯ' : 'Completed At'}</span>
-                        <span className="text-emerald-400 font-mono block mt-0.5">
-                          {completed.completedAt || 'Recently'}
-                        </span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))
+                </div>
               )}
             </div>
           )}
@@ -484,7 +510,6 @@ export default function ReporterView() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Surge Stop */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-indigo-400" /> {t.currentStop}
@@ -505,7 +530,7 @@ export default function ReporterView() {
                 </select>
               </div>
 
-              {/* OPTIONAL ROUTE CORRIDOR SELECTION */}
+              {/* Optional Corridor Selector */}
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

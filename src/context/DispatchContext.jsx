@@ -4,6 +4,7 @@ const DispatchContext = createContext();
 
 export function DispatchProvider({ children }) {
   const [userRole, setUserRole] = useState(() => localStorage.getItem('bmtc_role') || 'reporter');
+  
   const [alerts, setAlerts] = useState(() => {
     const saved = localStorage.getItem('bmtc_alerts');
     if (saved) {
@@ -38,39 +39,30 @@ export function DispatchProvider({ children }) {
     return [
       {
         id: 'pax-req-1',
-        passengerName: 'ramesh',
-        origin: 'NES Office / Yelahanka Police Station',
-        destination: 'Kogilu Cross (Yelahanka)',
+        passengerName: 'ram',
+        origin: 'ITPL Main Gate (Whitefield)',
+        destination: 'Corporation Circle (Hudson Circle)',
         groupCount: 1,
-        status: 'Queued',
+        status: 'Pending',
         time: 'Just now'
       },
       {
         id: 'pax-req-2',
-        passengerName: 'Commuter',
-        origin: 'NES Office / Yelahanka Police Station',
+        passengerName: 'ram',
+        origin: 'Electronic City Toll / Infosys Gate',
         destination: 'Majestic Kempegowda Bus Station (KBS)',
         groupCount: 1,
-        status: 'Queued',
+        status: 'Pending',
         time: 'Just now'
       },
       {
         id: 'pax-req-3',
-        passengerName: 'Ananya Rao',
-        origin: 'NES Office / Yelahanka Police Station',
+        passengerName: 'Commuter',
+        origin: 'Yelahanka Old Town / Santhe Circle',
         destination: 'Majestic Kempegowda Bus Station (KBS)',
-        groupCount: 3,
-        status: 'Queued',
+        groupCount: 1,
+        status: 'Pending',
         time: 'Just now'
-      },
-      {
-        id: 'pax-req-4',
-        passengerName: 'Karthik Gowda',
-        origin: 'NES Office / Yelahanka Police Station',
-        destination: 'Hebbal Flyover Junction',
-        groupCount: 2,
-        status: 'Queued',
-        time: '2 mins ago'
       }
     ];
   });
@@ -100,20 +92,6 @@ export function DispatchProvider({ children }) {
       status: 'Pending',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-
-    // If an alert is created for a corridor, automatically clear passenger requests matching that stop/corridor
-    setPassengerRequests((prev) =>
-      prev.filter((req) => {
-        if (alertData.customRoute) {
-          const matchesRoute =
-            req.origin === alertData.customRoute.origin &&
-            req.destination === alertData.customRoute.destination;
-          return !matchesRoute;
-        }
-        return req.origin !== alertData.stopLocation;
-      })
-    );
-
     setAlerts((prev) => [newAlert, ...prev]);
   };
 
@@ -121,10 +99,6 @@ export function DispatchProvider({ children }) {
     setAlerts((prev) =>
       prev.map((a) => {
         if ((a.id || a._id) === alertId) {
-          // Clear matching requests at this stop upon dispatch
-          setPassengerRequests((pax) =>
-            pax.filter((req) => req.origin !== a.stopLocation)
-          );
           return {
             ...a,
             status: 'Dispatched',
@@ -136,14 +110,19 @@ export function DispatchProvider({ children }) {
     );
   };
 
+  // AUTOMATED CLEARANCE: When a trip is completed at the destination or stop,
+  // matching passenger requests automatically transition to "Completed"
   const markTripCompleted = (alertId) => {
+    let completedStop = null;
+    let completedRoute = null;
+    let busPlate = null;
+
     setAlerts((prev) =>
       prev.map((a) => {
         if ((a.id || a._id) === alertId) {
-          // Clear any remaining requests for this stop
-          setPassengerRequests((pax) =>
-            pax.filter((req) => req.origin !== a.stopLocation)
-          );
+          completedStop = a.stopLocation;
+          completedRoute = a.customRoute;
+          busPlate = a.assignedBus;
           return {
             ...a,
             status: 'Completed',
@@ -153,20 +132,36 @@ export function DispatchProvider({ children }) {
         return a;
       })
     );
+
+    // Automatically transition matching passenger requests from Pending -> Completed
+    if (completedStop || completedRoute) {
+      setPassengerRequests((prev) =>
+        prev.map((req) => {
+          const matchesStop = completedStop && (req.origin.includes(completedStop) || completedStop.includes(req.origin));
+          const matchesCorridor = completedRoute && req.origin === completedRoute.origin;
+
+          if (matchesStop || matchesCorridor) {
+            return {
+              ...req,
+              status: 'Completed',
+              clearedByBus: busPlate || 'BMTC Relief Fleet',
+              completedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+          }
+          return req;
+        })
+      );
+    }
   };
 
   const addPassengerRequest = (requestData) => {
     const newReq = {
       ...requestData,
       id: 'pax-req-' + Date.now(),
-      status: 'Queued',
+      status: 'Pending',
       time: 'Just now'
     };
     setPassengerRequests((prev) => [newReq, ...prev]);
-  };
-
-  const clearPassengerRequest = (requestId) => {
-    setPassengerRequests((prev) => prev.filter((r) => r.id !== requestId));
   };
 
   return (
@@ -180,8 +175,7 @@ export function DispatchProvider({ children }) {
         acceptAlert,
         markTripCompleted,
         passengerRequests,
-        addPassengerRequest,
-        clearPassengerRequest
+        addPassengerRequest
       }}
     >
       {children}
