@@ -23,7 +23,9 @@ import {
   SlidersHorizontal,
   ArrowRight,
   Users,
-  Compass
+  Compass,
+  AlertTriangle,
+  Check
 } from 'lucide-react';
 
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -43,13 +45,12 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
 const COMMUTERS_PER_BUS = 65;
 
 export default function ReporterView() {
-  const { alerts, createAlert, markTripCompleted, passengerRequests } = useDispatch();
+  const { alerts, createAlert, markTripCompleted, passengerRequests, clearPassengerRequest } = useDispatch();
   const { t, lang } = useLanguage();
 
   const [selectedStopId, setSelectedStopId] = useState('s_nes');
   const [severity, setSeverity] = useState('Critical');
   const [passengerCount, setPassengerCount] = useState(130);
-  const [submittedMessage, setSubmittedMessage] = useState(false);
   const [activeTab, setActiveTab] = useState('live');
   const [expandedRouteId, setExpandedRouteId] = useState(null);
 
@@ -73,6 +74,8 @@ export default function ReporterView() {
     [customDestinationId]
   );
 
+  const isInvalidRoute = showCustomRoute && customOriginId === customDestinationId;
+
   const nearestDepots = useMemo(() => {
     return BMTC_DEPOTS.map((depot) => ({
       ...depot,
@@ -88,7 +91,6 @@ export default function ReporterView() {
     return Math.max(1, Math.ceil(count / COMMUTERS_PER_BUS));
   }, [passengerCount]);
 
-  // Handler to adopt passenger's requested route directly into form
   const handleAdoptPassengerRoute = (req) => {
     const foundOrigin = ALL_BANGALORE_STOPS.find((s) => s.name === req.origin);
     const foundDest = ALL_BANGALORE_STOPS.find((s) => s.name === req.destination);
@@ -100,6 +102,8 @@ export default function ReporterView() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isInvalidRoute) return;
+
     createAlert({
       stopLocation: currentStop.name,
       severity,
@@ -116,8 +120,6 @@ export default function ReporterView() {
           }
         : null,
     });
-    setSubmittedMessage(true);
-    setTimeout(() => setSubmittedMessage(false), 4500);
   };
 
   const activeAlerts = alerts.filter((a) => a.status !== 'Completed');
@@ -137,7 +139,7 @@ export default function ReporterView() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
-      {/* 1. HEADER & LIVE COMMUTER DEMANDS SECTION FOR FIELD IN-CHARGE */}
+      {/* HEADER & COMMUTER DEMANDS */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -153,72 +155,102 @@ export default function ReporterView() {
             <Users className="w-5 h-5 text-emerald-400" />
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಬೇಡಿಕೆಗಳು' : 'Passenger Corridor Requests'}
+                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಬಾಕಿ ಬೇಡಿಕೆಗಳು' : 'Pending Corridor Requests'}
               </span>
               <span className="text-sm font-black text-emerald-400 font-mono">
-                {passengerRequests.length} Active Requests
+                {passengerRequests.length} {lang === 'kn' ? 'ಬಾಕಿ ಇವೆ' : 'Active'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* COMMUTER DEMAND QUEUE DISPLAYED HERE FOR IN-CHARGE */}
+        {/* COMMUTER DEMAND QUEUE */}
         <div className="pt-4 border-t border-slate-800/80 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-emerald-400" />
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಪ್ರಯಾಣ ಬೇಡಿಕೆಗಳು (ಕಾರ್ಯ ನಿರ್ವಾಹಕರ ವೀಕ್ಷಣೆ)' : 'Live Commuter Route Demands (Field In-Charge Feed)'}
+                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಪ್ರಯಾಣ ಬೇಡಿಕೆಗಳು' : 'Live Commuter Route Demands'}
               </h3>
             </div>
-            <span className="text-[11px] text-slate-400">
-              {lang === 'kn' ? 'ಮಾರ್ಗ ಆಯ್ಕೆ ಮಾಡಲು "ಅಳವಡಿಸಿ" ಕ್ಲಿಕ್ ಮಾಡಿ' : 'Click "Adopt Route" to schedule relief bus'}
-            </span>
+            {passengerRequests.length > 0 && (
+              <span className="text-[11px] text-slate-400">
+                {lang === 'kn' ? 'ಮಾರ್ಗ ಆಯ್ಕೆ ಮಾಡಲು "ಅಳವಡಿಸಿ" ಕ್ಲಿಕ್ ಮಾಡಿ' : 'Click "Adopt Route" to dispatch relief bus'}
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {passengerRequests.map((req) => (
-              <div
-                key={req.id}
-                className="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-2xl space-y-2 transition flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-900">
-                    <span className="font-bold text-white">{req.passengerName}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">{req.time}</span>
-                  </div>
-
-                  <div className="mt-2 text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-300">
-                      <span className="text-emerald-400 font-semibold truncate">{req.origin}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-indigo-300">
-                      <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
-                      <span className="font-semibold truncate">{req.destination}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 mt-2 border-t border-slate-900 flex items-center justify-between">
-                  <span className="text-[11px] text-amber-300 font-mono font-bold">
-                    {req.groupCount} Commuter{req.groupCount > 1 ? 's' : ''}
-                  </span>
-
-                  <button
-                    onClick={() => handleAdoptPassengerRoute(req)}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-200 hover:text-white text-[11px] font-bold transition flex items-center gap-1"
-                  >
-                    <Compass className="w-3 h-3" />
-                    <span>{lang === 'kn' ? 'ಮಾರ್ಗ ಅಳವಡಿಸಿ' : 'Adopt Route'}</span>
-                  </button>
-                </div>
+          {/* If No Passenger Requests are pending */}
+          {passengerRequests.length === 0 ? (
+            <div className="bg-slate-950/70 border border-dashed border-emerald-500/30 rounded-2xl p-6 text-center space-y-2">
+              <CheckCircle2 className="w-7 h-7 text-emerald-400 mx-auto" />
+              <div className="text-xs font-bold text-white">
+                {lang === 'kn'
+                  ? 'ಯಾವುದೇ ಬಾಕಿ ಬೇಡಿಕೆಗಳಿಲ್ಲ — ಎಲ್ಲಾ ಪ್ರಯಾಣಿಕರ ಬೇಡಿಕೆಗಳಿಗೆ ಬಸ್‌ಗಳನ್ನು ಕಳುಹಿಸಲಾಗಿದೆ!'
+                  : 'All Passenger Requests Cleared — Relief Buses Dispatched to Stops!'}
               </div>
-            ))}
-          </div>
+              <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                {lang === 'kn'
+                  ? 'ಪ್ರಯಾಣಿಕರು ಹೊಸ ಮಾರ್ಗವನ್ನು ಕೋರಿದ ತಕ್ಷಣ ಇಲ್ಲಿ ಲೈವ್ ಆಗಿ ಕಾಣಿಸುತ್ತದೆ.'
+                  : 'As soon as commuters at stops request new pickup corridors, they will appear here.'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {passengerRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-2xl space-y-2 transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-900">
+                      <span className="font-bold text-white truncate max-w-[100px]">{req.passengerName}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{req.time}</span>
+                    </div>
+
+                    <div className="mt-2 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <span className="text-emerald-400 font-semibold truncate text-[11px]">{req.origin}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-indigo-300">
+                        <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                        <span className="font-semibold truncate text-[11px]">{req.destination}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 mt-2 border-t border-slate-900 flex items-center justify-between gap-1">
+                    <span className="text-[11px] text-amber-300 font-mono font-bold">
+                      {req.groupCount} Pax
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleAdoptPassengerRoute(req)}
+                        title="Adopt this route into dispatch form"
+                        className="px-2 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-200 hover:text-white text-[10px] font-bold transition flex items-center gap-1"
+                      >
+                        <Compass className="w-3 h-3" />
+                        <span>{lang === 'kn' ? 'ಅಳವಡಿಸಿ' : 'Adopt'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => clearPassengerRequest(req.id)}
+                        title="Clear request manually (bus reached stop)"
+                        className="p-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 2. DISPATCH CONTROLS & ACTIVE MISSION SECTION */}
+      {/* DISPATCH CONTROLS & ACTIVE MISSION SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Side: Active Relief Transits & Archive */}
         <div className="lg:col-span-7 space-y-6">
@@ -539,13 +571,29 @@ export default function ReporterView() {
                       </select>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 flex items-center gap-1.5">
-                      <ArrowRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span>
-                        {lang === 'kn' ? 'ಬಸ್ ಮಾರ್ಗ:' : 'Route Corridor:'}{' '}
-                        <strong>{customOriginStop.name}</strong> ➔ <strong>{customDestStop.name}</strong>
-                      </span>
-                    </div>
+                    {isInvalidRoute ? (
+                      <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <div>
+                          <strong className="block font-bold">
+                            {lang === 'kn' ? 'ತಪ್ಪಾದ ಮಾರ್ಗ ಆಯ್ಕೆ!' : 'Invalid Transit Route!'}
+                          </strong>
+                          <span className="text-[11px] text-rose-200/90">
+                            {lang === 'kn'
+                              ? 'ಆರಂಭಿಕ ಮತ್ತು ಅಂತಿಮ ನಿಲ್ದಾಣಗಳು ಒಂದೇ ಆಗಿರಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೇರೆ ತಲುಪುವ ನಿಲ್ದಾಣವನ್ನು ಆರಿಸಿ.'
+                              : 'Starting stop and ending destination cannot be the same. Please choose a different destination stop.'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 flex items-center gap-1.5">
+                        <ArrowRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span>
+                          {lang === 'kn' ? 'ಬಸ್ ಮಾರ್ಗ:' : 'Route Corridor:'}{' '}
+                          <strong>{customOriginStop.name}</strong> ➔ <strong>{customDestStop.name}</strong>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -627,13 +675,24 @@ export default function ReporterView() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/40 transition"
-              >
-                <Send className="w-4 h-4" />
-                <span>{t.sendRequestBtn} {nearestDepot.depotNumber} ({nearestDepot.name})</span>
-              </button>
+              {isInvalidRoute ? (
+                <div className="w-full py-3.5 px-4 bg-rose-950/50 border border-rose-500/50 rounded-xl text-xs text-rose-300 text-center font-bold flex items-center justify-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>
+                    {lang === 'kn'
+                      ? 'ಆರಂಭಿಕ ಮತ್ತು ಅಂತಿಮ ನಿಲ್ದಾಣಗಳು ಒಂದೇ ಆಗಿವೆ — ವಿನಂತಿಯನ್ನು ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ'
+                      : 'Origin and Destination are identical — Cannot transmit request'}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/40 transition"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{t.sendRequestBtn} {nearestDepot.depotNumber} ({nearestDepot.name})</span>
+                </button>
+              )}
             </form>
           </div>
         </div>

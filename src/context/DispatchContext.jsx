@@ -3,7 +3,7 @@
 const DispatchContext = createContext();
 
 export function DispatchProvider({ children }) {
-  const [userRole, setUserRole] = useState(() => localStorage.getItem('bmtc_role') || 'passenger');
+  const [userRole, setUserRole] = useState(() => localStorage.getItem('bmtc_role') || 'reporter');
   const [alerts, setAlerts] = useState(() => {
     const saved = localStorage.getItem('bmtc_alerts');
     if (saved) {
@@ -30,7 +30,6 @@ export function DispatchProvider({ children }) {
     ];
   });
 
-  // Passenger Travel Demands List
   const [passengerRequests, setPassengerRequests] = useState(() => {
     const saved = localStorage.getItem('bmtc_pax_requests');
     if (saved) {
@@ -39,8 +38,25 @@ export function DispatchProvider({ children }) {
     return [
       {
         id: 'pax-req-1',
+        passengerName: 'ramesh',
+        origin: 'NES Office / Yelahanka Police Station',
+        destination: 'Kogilu Cross (Yelahanka)',
+        groupCount: 1,
+        status: 'Queued',
+        time: 'Just now'
+      },
+      {
+        id: 'pax-req-2',
+        passengerName: 'Commuter',
+        origin: 'NES Office / Yelahanka Police Station',
+        destination: 'Majestic Kempegowda Bus Station (KBS)',
+        groupCount: 1,
+        status: 'Queued',
+        time: 'Just now'
+      },
+      {
+        id: 'pax-req-3',
         passengerName: 'Ananya Rao',
-        passengerPhone: '+91 98450 12890',
         origin: 'NES Office / Yelahanka Police Station',
         destination: 'Majestic Kempegowda Bus Station (KBS)',
         groupCount: 3,
@@ -48,9 +64,8 @@ export function DispatchProvider({ children }) {
         time: 'Just now'
       },
       {
-        id: 'pax-req-2',
+        id: 'pax-req-4',
         passengerName: 'Karthik Gowda',
-        passengerPhone: '+91 99801 44521',
         origin: 'NES Office / Yelahanka Police Station',
         destination: 'Hebbal Flyover Junction',
         groupCount: 2,
@@ -85,6 +100,20 @@ export function DispatchProvider({ children }) {
       status: 'Pending',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+
+    // If an alert is created for a corridor, automatically clear passenger requests matching that stop/corridor
+    setPassengerRequests((prev) =>
+      prev.filter((req) => {
+        if (alertData.customRoute) {
+          const matchesRoute =
+            req.origin === alertData.customRoute.origin &&
+            req.destination === alertData.customRoute.destination;
+          return !matchesRoute;
+        }
+        return req.origin !== alertData.stopLocation;
+      })
+    );
+
     setAlerts((prev) => [newAlert, ...prev]);
   };
 
@@ -92,6 +121,10 @@ export function DispatchProvider({ children }) {
     setAlerts((prev) =>
       prev.map((a) => {
         if ((a.id || a._id) === alertId) {
+          // Clear matching requests at this stop upon dispatch
+          setPassengerRequests((pax) =>
+            pax.filter((req) => req.origin !== a.stopLocation)
+          );
           return {
             ...a,
             status: 'Dispatched',
@@ -107,6 +140,10 @@ export function DispatchProvider({ children }) {
     setAlerts((prev) =>
       prev.map((a) => {
         if ((a.id || a._id) === alertId) {
+          // Clear any remaining requests for this stop
+          setPassengerRequests((pax) =>
+            pax.filter((req) => req.origin !== a.stopLocation)
+          );
           return {
             ...a,
             status: 'Completed',
@@ -128,6 +165,10 @@ export function DispatchProvider({ children }) {
     setPassengerRequests((prev) => [newReq, ...prev]);
   };
 
+  const clearPassengerRequest = (requestId) => {
+    setPassengerRequests((prev) => prev.filter((r) => r.id !== requestId));
+  };
+
   return (
     <DispatchContext.Provider
       value={{
@@ -139,7 +180,8 @@ export function DispatchProvider({ children }) {
         acceptAlert,
         markTripCompleted,
         passengerRequests,
-        addPassengerRequest
+        addPassengerRequest,
+        clearPassengerRequest
       }}
     >
       {children}
