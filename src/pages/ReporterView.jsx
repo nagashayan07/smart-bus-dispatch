@@ -21,7 +21,9 @@ import {
   ChevronDown, 
   ChevronUp,
   SlidersHorizontal,
-  ArrowRight
+  ArrowRight,
+  Users,
+  Compass
 } from 'lucide-react';
 
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -41,22 +43,20 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
 const COMMUTERS_PER_BUS = 65;
 
 export default function ReporterView() {
-  const { alerts, createAlert, markTripCompleted } = useDispatch();
+  const { alerts, createAlert, markTripCompleted, passengerRequests } = useDispatch();
   const { t, lang } = useLanguage();
 
-  // Basic Form State
   const [selectedStopId, setSelectedStopId] = useState('s_nes');
   const [severity, setSeverity] = useState('Critical');
   const [passengerCount, setPassengerCount] = useState(130);
   const [submittedMessage, setSubmittedMessage] = useState(false);
   const [activeTab, setActiveTab] = useState('live');
   const [expandedRouteId, setExpandedRouteId] = useState(null);
-  const [expandedCompletedId, setExpandedCompletedId] = useState(null);
 
   // Optional Custom Route Specification
   const [showCustomRoute, setShowCustomRoute] = useState(false);
   const [customOriginId, setCustomOriginId] = useState('s_nes');
-  const [customDestinationId, setCustomDestinationId] = useState('s1'); // Majestic KBS default destination
+  const [customDestinationId, setCustomDestinationId] = useState('s1');
 
   const currentStop = useMemo(
     () => ALL_BANGALORE_STOPS.find((s) => s.id === selectedStopId) || ALL_BANGALORE_STOPS[0],
@@ -88,6 +88,16 @@ export default function ReporterView() {
     return Math.max(1, Math.ceil(count / COMMUTERS_PER_BUS));
   }, [passengerCount]);
 
+  // Handler to adopt passenger's requested route directly into form
+  const handleAdoptPassengerRoute = (req) => {
+    const foundOrigin = ALL_BANGALORE_STOPS.find((s) => s.name === req.origin);
+    const foundDest = ALL_BANGALORE_STOPS.find((s) => s.name === req.destination);
+    if (foundOrigin) setSelectedStopId(foundOrigin.id);
+    if (foundOrigin) setCustomOriginId(foundOrigin.id);
+    if (foundDest) setCustomDestinationId(foundDest.id);
+    setShowCustomRoute(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     createAlert({
@@ -99,7 +109,6 @@ export default function ReporterView() {
       targetDepot: nearestDepot.name,
       depotPhone: nearestDepot.phone,
       nearestDistance: `${nearestDepot.distanceKm} km`,
-      // Optional corridor details saved if enabled
       customRoute: showCustomRoute
         ? {
             origin: customOriginStop.name,
@@ -127,20 +136,11 @@ export default function ReporterView() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-5rem)] w-full rounded-3xl overflow-hidden p-4 md:p-8 flex flex-col justify-between">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-20 scale-105"
-        style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=2200&q=80')`,
-        }}
-      />
-      <div className="absolute inset-0 bg-slate-950/85 pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-950/80 to-indigo-950/40 pointer-events-none" />
-
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start max-w-7xl mx-auto w-full">
-        {/* Left Side: Live Requests */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="space-y-2">
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* 1. HEADER & LIVE COMMUTER DEMANDS SECTION FOR FIELD IN-CHARGE */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
               <Radio className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
               <span>{t.telemetryBadge}</span>
@@ -149,7 +149,79 @@ export default function ReporterView() {
             <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{t.fieldSubtitle}</p>
           </div>
 
-          {/* Section Tabs */}
+          <div className="flex items-center gap-3 self-start md:self-auto bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-2xl">
+            <Users className="w-5 h-5 text-emerald-400" />
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಬೇಡಿಕೆಗಳು' : 'Passenger Corridor Requests'}
+              </span>
+              <span className="text-sm font-black text-emerald-400 font-mono">
+                {passengerRequests.length} Active Requests
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* COMMUTER DEMAND QUEUE DISPLAYED HERE FOR IN-CHARGE */}
+        <div className="pt-4 border-t border-slate-800/80 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                {lang === 'kn' ? 'ಪ್ರಯಾಣಿಕರ ಲೈವ್ ಪ್ರಯಾಣ ಬೇಡಿಕೆಗಳು (ಕಾರ್ಯ ನಿರ್ವಾಹಕರ ವೀಕ್ಷಣೆ)' : 'Live Commuter Route Demands (Field In-Charge Feed)'}
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              {lang === 'kn' ? 'ಮಾರ್ಗ ಆಯ್ಕೆ ಮಾಡಲು "ಅಳವಡಿಸಿ" ಕ್ಲಿಕ್ ಮಾಡಿ' : 'Click "Adopt Route" to schedule relief bus'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {passengerRequests.map((req) => (
+              <div
+                key={req.id}
+                className="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-2xl space-y-2 transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-900">
+                    <span className="font-bold text-white">{req.passengerName}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">{req.time}</span>
+                  </div>
+
+                  <div className="mt-2 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <span className="text-emerald-400 font-semibold truncate">{req.origin}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-indigo-300">
+                      <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                      <span className="font-semibold truncate">{req.destination}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-slate-900 flex items-center justify-between">
+                  <span className="text-[11px] text-amber-300 font-mono font-bold">
+                    {req.groupCount} Commuter{req.groupCount > 1 ? 's' : ''}
+                  </span>
+
+                  <button
+                    onClick={() => handleAdoptPassengerRoute(req)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-200 hover:text-white text-[11px] font-bold transition flex items-center gap-1"
+                  >
+                    <Compass className="w-3 h-3" />
+                    <span>{lang === 'kn' ? 'ಮಾರ್ಗ ಅಳವಡಿಸಿ' : 'Adopt Route'}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. DISPATCH CONTROLS & ACTIVE MISSION SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Side: Active Relief Transits & Archive */}
+        <div className="lg:col-span-7 space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
             <button
               onClick={() => setActiveTab('live')}
@@ -176,7 +248,6 @@ export default function ReporterView() {
             </button>
           </div>
 
-          {/* TAB 1: ACTIVE TRANSIT */}
           {activeTab === 'live' && (
             <div className="space-y-4">
               {activeAlerts.length === 0 ? (
@@ -204,12 +275,11 @@ export default function ReporterView() {
                             </span>
                           </div>
                           
-                          {/* Custom Planned Route Display */}
                           {dispatch.customRoute && (
                             <div className="text-xs text-indigo-300 flex items-center gap-1.5 pt-0.5">
                               <Route className="w-3.5 h-3.5 text-indigo-400" />
                               <span>
-                                {lang === 'kn' ? 'ನಿಗದಿತ ಮಾರ್ಗ:' : 'Designated Route:'}{' '}
+                                {lang === 'kn' ? 'ನಿಗದಿತ ಮಾರ್ಗ:' : 'Designated Corridor:'}{' '}
                                 <strong className="text-white">{dispatch.customRoute.origin}</strong> ➔ <strong className="text-emerald-400">{dispatch.customRoute.destination}</strong>
                               </span>
                             </div>
@@ -307,7 +377,6 @@ export default function ReporterView() {
             </div>
           )}
 
-          {/* TAB 2: COMPLETED ARCHIVE */}
           {activeTab === 'completed' && (
             <div className="space-y-4">
               {completedAlerts.length === 0 ? (
@@ -326,11 +395,6 @@ export default function ReporterView() {
                             {completed.passengerCount} {t.commutersCleared}
                           </span>
                         </div>
-                        {completed.customRoute && (
-                          <span className="text-xs text-indigo-300 block mt-0.5">
-                            {completed.customRoute.origin} ➔ {completed.customRoute.destination}
-                          </span>
-                        )}
                       </div>
 
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg">
@@ -372,7 +436,7 @@ export default function ReporterView() {
           )}
         </div>
 
-        {/* Right Side: Broadcast Form */}
+        {/* Right Side: Broadcast Surge Form */}
         <div className="lg:col-span-5 w-full">
           <div className="bg-slate-900/90 backdrop-blur-2xl border border-slate-700/80 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -409,7 +473,7 @@ export default function ReporterView() {
                 </select>
               </div>
 
-              {/* OPTIONAL ROUTE CORRIDOR TOGGLE (STARTING TO ENDING STOP) */}
+              {/* OPTIONAL ROUTE CORRIDOR SELECTION */}
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -437,7 +501,6 @@ export default function ReporterView() {
                   </button>
                 </div>
 
-                {/* Collapsible Dropdowns for Start and End Stop */}
                 {showCustomRoute && (
                   <div className="space-y-3 pt-2 border-t border-slate-800 animate-in fade-in duration-150">
                     <div className="space-y-1">
@@ -487,7 +550,7 @@ export default function ReporterView() {
                 )}
               </div>
 
-              {/* Priority Selection */}
+              {/* Priority */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">{t.surgePriority}</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -534,7 +597,7 @@ export default function ReporterView() {
                 />
               </div>
 
-              {/* Bus Sizing Box */}
+              {/* Sizing Box */}
               <div className="bg-gradient-to-br from-indigo-950/60 to-slate-950 border border-indigo-500/40 rounded-2xl p-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
@@ -546,7 +609,7 @@ export default function ReporterView() {
                 </div>
               </div>
 
-              {/* Target Nearest Depot Card */}
+              {/* Nearest Depot Card */}
               <div className="space-y-2 bg-slate-950 border border-emerald-500/30 rounded-2xl p-3.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400 flex items-center gap-1">
